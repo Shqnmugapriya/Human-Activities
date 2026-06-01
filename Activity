@@ -1,0 +1,64 @@
+!pip install mediapipe==0.10.20 opencv-python numpy
+from google.colab import files
+uploaded = files.upload()  # upload the saved 'sample.mp4'
+import cv2
+import mediapipe as mp
+import numpy as np
+from IPython.display import Video, display
+
+# Initialize mediapipe pose model
+mp_pose = mp.solutions.pose
+mp_drawing = mp.solutions.drawing_utils
+
+# Basic rule-based activity classification
+def classify_activity(landmarks):
+    left_knee = landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value]
+    left_ankle = landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value]
+    left_hip = landmarks[mp_pose.PoseLandmark.LEFT_HIP.value]
+    vertical_distance = abs(left_hip.y - left_ankle.y)
+
+    if vertical_distance < 0.3:
+        return "Sitting"
+    elif vertical_distance > 0.5:
+        return "Standing/Walking"
+    else:
+        return "Unknown"
+
+# Input and output video paths
+input_video = "DALL·E 2025-04-04 10.53.49 - An anime-style illustration of a young woman in a long, flowing dress with intricate patterns, standing on a grassy patch in front of a textured wall.webp.mp4.png"   # use your uploaded filename exactly
+output_video = "output.mp4"
+
+cap = cv2.VideoCapture(input_video)
+width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+fps    = cap.get(cv2.CAP_PROP_FPS)
+writer = cv2.VideoWriter(output_video, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+
+with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # Process frame
+        image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = pose.process(image)
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+        if results.pose_landmarks:
+            mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+            activity = classify_activity(results.pose_landmarks.landmark)
+            cv2.putText(image, f'Activity: {activity}', (20, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+
+        writer.write(image)
+
+cap.release()
+writer.release()
+print("✅ Processing complete! Output saved as", output_video)
+from IPython.display import Video, display
+display(Video("output.mp4", embed=True))
+from google.colab import files
+files.download("output.mp4")
+
+
